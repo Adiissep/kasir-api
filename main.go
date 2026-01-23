@@ -117,9 +117,9 @@ func deleteProductByID(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Product not found", http.StatusNotFound)
 }
 
-// GET localhost:8080/api/categorys/{id}
+// GET localhost:8080/api/categories/{id}
 func getCategoryByID(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/api/categorys/")
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/categories/")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid category ID", http.StatusBadRequest)
@@ -137,10 +137,10 @@ func getCategoryByID(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Category not found", http.StatusNotFound)
 }
 
-// PUT localhost:8080/api/categorys/{id}
+// PUT localhost:8080/api/categories/{id}
 func updateCategoryByID(w http.ResponseWriter, r *http.Request) {
 	// GET category ID from URL
-	idStr := strings.TrimPrefix(r.URL.Path, "/api/categorys/")
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/categories/")
 
 	// Convert ID to integer
 	id, err := strconv.Atoi(idStr)
@@ -171,10 +171,10 @@ func updateCategoryByID(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Category not found", http.StatusNotFound)
 }
 
-// DELETE localhost:8080/api/categorys/{id}
+// DELETE localhost:8080/api/categories/{id}
 func deleteCategoryByID(w http.ResponseWriter, r *http.Request) {
 	// GET product ID from URL
-	idStr := strings.TrimPrefix(r.URL.Path, "/api/categorys/")
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/categories/")
 
 	// Convert ID to integer
 	id, err := strconv.Atoi(idStr)
@@ -199,8 +199,8 @@ func deleteCategoryByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	//GET & POST localhost:8080/api/categorys
-	http.HandleFunc("/api/categorys", func(w http.ResponseWriter, r *http.Request) {
+	//GET & POST localhost:8080/api/categories
+	http.HandleFunc("/api/categories", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "GET":
 			w.Header().Set("Content-Type", "application/json")
@@ -226,7 +226,7 @@ func main() {
 
 	//GET & PUT localhost:8080/api/products/{id}
 	//DELETE localhost:8080/api/products/{id}
-	http.HandleFunc("/api/categorys/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/categories/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "GET":
 			// Implement getCategoryByID if needed
@@ -283,7 +283,19 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
 			"status":  "OK 200",
-			"message": "Welcome to the Kasir API"})
+			"message": "Welcome to the Kasir API",
+			"documentation": "// GET localhost:8080/api/categories\n" +
+				"// POST localhost:8080/api/categories\n" +
+				"// GET localhost:8080/api/categories/{id}\n" +
+				"// PUT localhost:8080/api/categories/{id}\n" +
+				"// DELETE localhost:8080/api/categories/{id}\n" +
+
+				"// GET localhost:8080/api/products\n" +
+				"// POST localhost:8080/api/products\n" +
+				"// GET localhost:8080/api/products/{id}\n" +
+				"// PUT localhost:8080/api/products/{id}\n" +
+				"// DELETE localhost:8080/api/products/{id}\n",
+		})
 	})
 
 	fmt.Println("Server running di localhost:8080 🚀")
