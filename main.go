@@ -48,7 +48,10 @@ func getProductByID(w http.ResponseWriter, r *http.Request) {
 	for _, p := range products {
 		if p.ID == id {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(p)
+			if err := json.NewEncoder(w).Encode(p); err != nil {
+				http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 			return
 		}
 	}
@@ -83,7 +86,10 @@ func updateProductByID(w http.ResponseWriter, r *http.Request) {
 			products[i] = updatedProduct
 
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(products[i])
+			if err := json.NewEncoder(w).Encode(products[i]); err != nil {
+				http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 			return
 		}
 	}
@@ -108,9 +114,12 @@ func deleteProductByID(w http.ResponseWriter, r *http.Request) {
 			//create new slice with before and after index
 			products = append(products[:i], products[i+1:]...)
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{
+			if err := json.NewEncoder(w).Encode(map[string]string{
 				"message": "Product deleted successfully",
-			})
+			}); err != nil {
+				http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 			return
 		}
 	}
@@ -129,7 +138,10 @@ func getCategoryByID(w http.ResponseWriter, r *http.Request) {
 	for _, c := range categories {
 		if c.ID == id {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(c)
+			if err := json.NewEncoder(w).Encode(c); err != nil {
+				http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 			return
 		}
 	}
@@ -164,7 +176,10 @@ func updateCategoryByID(w http.ResponseWriter, r *http.Request) {
 			categories[i] = updatedCategory
 
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(categories[i])
+			if err := json.NewEncoder(w).Encode(categories[i]); err != nil {
+				http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 			return
 		}
 	}
@@ -189,9 +204,12 @@ func deleteCategoryByID(w http.ResponseWriter, r *http.Request) {
 			//create new slice with before and after index
 			categories = append(categories[:i], categories[i+1:]...)
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{
+			if err := json.NewEncoder(w).Encode(map[string]string{
 				"message": "Category deleted successfully",
-			})
+			}); err != nil {
+				http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 			return
 		}
 	}
@@ -204,7 +222,10 @@ func main() {
 		switch r.Method {
 		case "GET":
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(categories)
+			if err := json.NewEncoder(w).Encode(categories); err != nil {
+				http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 		case "POST":
 			// read data from request body
 			var newCategory Category
@@ -220,7 +241,10 @@ func main() {
 
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(newCategory)
+			if err := json.NewEncoder(w).Encode(newCategory); err != nil {
+				http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 	})
 
@@ -245,7 +269,10 @@ func main() {
 		switch r.Method {
 		case "GET":
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(products)
+			if err := json.NewEncoder(w).Encode(products); err != nil {
+				http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 		case "POST":
 			// read data from request body
 			var newProduct Product
@@ -261,7 +288,10 @@ func main() {
 
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(newProduct)
+			if err := json.NewEncoder(w).Encode(newProduct); err != nil {
+				http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 	})
 
@@ -281,21 +311,25 @@ func main() {
 	//localhost:8080/api
 	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
-			"status":  "OK 200",
-			"message": "Welcome to the Kasir API",
-			"documentation": "// GET localhost:8080/api/categories\n" +
-				"// POST localhost:8080/api/categories\n" +
-				"// GET localhost:8080/api/categories/{id}\n" +
-				"// PUT localhost:8080/api/categories/{id}\n" +
-				"// DELETE localhost:8080/api/categories/{id}\n" +
-
-				"// GET localhost:8080/api/products\n" +
-				"// POST localhost:8080/api/products\n" +
-				"// GET localhost:8080/api/products/{id}\n" +
-				"// PUT localhost:8080/api/products/{id}\n" +
-				"// DELETE localhost:8080/api/products/{id}\n",
-		})
+		if err := json.NewEncoder(w).Encode(map[string]any{
+			"status":  "Success",
+			"message": "Welcome to the Cashier API",
+			"endpoints": []string{
+				"GET /api/categories",
+				"POST /api/categories",
+				"GET /api/categories/{id}",
+				"PUT /api/categories/{id}",
+				"DELETE /api/categories/{id}",
+				"GET /api/products",
+				"POST /api/products",
+				"GET /api/products/{id}",
+				"PUT /api/products/{id}",
+				"DELETE /api/products/{id}",
+			},
+		}); err != nil {
+			http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	})
 
 	fmt.Println("Server running di localhost:8080 🚀")
