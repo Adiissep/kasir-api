@@ -2,11 +2,15 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"kasir-api/models"
 	"kasir-api/services"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type ProductHandler struct {
@@ -88,7 +92,11 @@ func (h *ProductHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	product, err := h.service.GetByID(id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		if errors.Is(err, pgx.ErrNoRows) || strings.Contains(strings.ToLower(err.Error()), "not found") {
+			http.Error(w, "Product not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "Failed to get product: "+err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -104,20 +112,102 @@ func (h *ProductHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var product models.Product
-	if err := json.NewDecoder(r.Body).Decode(&product); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	// Baca body sekali
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// Struct untuk field lain (pointer → partial update)
+	type UpdateReq struct {
+		Name  *string `json:"name"`
+		Price *int    `json:"price"`
+		Stock *int    `json:"stock"`
+		// CategoryID akan diproses manual untuk bedakan "missing" vs "null"
+	}
+
+	var req UpdateReq
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Deteksi presence key "category_id" dan nil vs value
+	var raw map[string]*json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	categoryPresent := false
+	var categoryIDDecoded *int // jika present & bukan null → pointer ke int, jika present & null → tetap nil
+	if raw != nil {
+		if rm, ok := raw["category_id"]; ok {
+			categoryPresent = true
+			if rm != nil {
+				var v int
+				if err := json.Unmarshal(*rm, &v); err != nil {
+					http.Error(w, "Invalid category_id (must be number or null)", http.StatusBadRequest)
+					return
+				}
+				categoryIDDecoded = &v
+			} else {
+				// rm == nil → "category_id": null
+				categoryIDDecoded = nil
+			}
+		}
+	}
+
+	old, err := h.service.GetByID(id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) || strings.Contains(strings.ToLower(err.Error()), "not found") {
+			http.Error(w, "Product not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "Failed to get product: "+err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
-	product.ID = id
-	if err := h.service.Update(&product); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if req.Name != nil {
+		old.Name = *req.Name
+	}
+	if req.Price != nil {
+		old.Price = *req.Price
+	}
+	if req.Stock != nil {
+		old.Stock = *req.Stock
+	}
+
+	// category_id: hanya ubah kalau key hadir
+	if categoryPresent {
+		// present + null → unset (set NULL di DB)
+		// present + number → set new value
+		old.CategoryID = categoryIDDecoded
+	}
+
+	if err := h.service.Update(old); err != nil {
+		http.Error(w, "Failed to update product: "+err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	// Re-fetch setelah update agar category_name hasil JOIN ikut terbarui
+	updated, err := h.service.GetByID(id)
+	if err == nil {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(updated)
+		return
+	}
+
+	// Fallback: jika re-fetch gagal, set category_name sesuai perubahan category_id
+	if categoryPresent && categoryIDDecoded == nil {
+		old.CategoryName = ""
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(product)
+	_ = json.NewEncoder(w).Encode(old)
 }
 
 func (h *ProductHandler) Delete(w http.ResponseWriter, r *http.Request) {

@@ -2,10 +2,13 @@ package repositories
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"kasir-api/models"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -43,21 +46,44 @@ func (repo *ProductRepository) Create(product *models.Product) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	const query = `INSERT INTO products (name, price, stock) VALUES ($1, $2, $3) RETURNING id`
-	return repo.pool.QueryRow(ctx, query, product.Name, product.Price, product.Stock).Scan(&product.ID)
+	const query = `
+		INSERT INTO products (name, price, stock, category_id) 
+		VALUES ($1, $2, $3, $4) RETURNING id`
+	return repo.pool.QueryRow(ctx, query, product.Name, product.Price, product.Stock, product.CategoryID).Scan(&product.ID)
 }
 
 func (repo *ProductRepository) GetByID(id int) (*models.Product, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	const query = `SELECT id, name, price, stock FROM products WHERE id = $1`
-	var p models.Product
-	err := repo.pool.QueryRow(ctx, query, id).Scan(&p.ID, &p.Name, &p.Price, &p.Stock)
+	const query = `
+		SELECT p.id, p.name, p.price, p.stock, p.category_id, COALESCE(c.name, '') AS category_name
+        FROM products p
+        LEFT JOIN categories c ON c.id = p.category_id
+        WHERE p.id = $1
+		`
+	var (
+		p       models.Product
+		catID   sql.NullInt32
+		catName string
+	)
+
+	err := repo.pool.QueryRow(ctx, query, id).Scan(&p.ID, &p.Name, &p.Price, &p.Stock, &catID, &catName)
 	if err != nil {
-		// pgx tidak mengembalikan sql.ErrNoRows, gunakan errors.New untuk pesan user-friendly
-		return nil, errors.New("product not found")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("product not found")
+		}
+		return nil, err
 	}
+
+	if catID.Valid {
+		v := int(catID.Int32)
+		p.CategoryID = &v
+	} else {
+		p.CategoryID = nil
+	}
+	p.CategoryName = catName
+
 	return &p, nil
 }
 
@@ -65,8 +91,18 @@ func (repo *ProductRepository) Update(product *models.Product) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	const query = `UPDATE products SET name = $1, price = $2, stock = $3 WHERE id = $4`
-	ct, err := repo.pool.Exec(ctx, query, product.Name, product.Price, product.Stock, product.ID)
+	// category_id nullable
+	var cat pgtype.Int4
+	if product.CategoryID != nil {
+		cat = pgtype.Int4{Int32: int32(*product.CategoryID), Valid: true}
+	} else {
+		cat = pgtype.Int4{Valid: false} // akan ditulis sebagai NULL
+	}
+
+	const query = `UPDATE products 
+				   SET name = $1, price = $2, stock = $3, category_id = $4 
+				   WHERE id = $5`
+	ct, err := repo.pool.Exec(ctx, query, product.Name, product.Price, product.Stock, cat, product.ID)
 	if err != nil {
 		return err
 	}

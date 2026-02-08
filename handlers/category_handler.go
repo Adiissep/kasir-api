@@ -100,6 +100,35 @@ func (h *CategoryHandler) updateCategory(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	type UpdateReq struct {
+		Name        *string `json:"name"`
+		Description *string `json:"description"`
+	}
+	var req UpdateReq
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	old, err := h.service.GetCategoryByID(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	if req.Name != nil {
+		old.Name = *req.Name
+	}
+	if req.Description != nil {
+		old.Description = *req.Description
+	}
+
+	if err := h.service.UpdateCategory(old); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(old)
+
 	var updatedCategory models.Category
 	if err := json.NewDecoder(r.Body).Decode(&updatedCategory); err != nil {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
