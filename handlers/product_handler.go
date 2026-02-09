@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"kasir-api/models"
 	"kasir-api/services"
@@ -36,7 +37,9 @@ func (h *ProductHandler) HandleProducts(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *ProductHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	products, err := h.service.GetAll()
+	name := r.URL.Query().Get("name")
+	fmt.Println("Filtering products by name:", name)
+	products, err := h.service.GetAll(name)
 	if err != nil {
 		http.Error(w, "Failed to get all products: "+err.Error(), http.StatusInternalServerError)
 		return
