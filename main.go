@@ -86,12 +86,17 @@ func main() {
 				"GET /api/product/{id}",
 				"PUT /api/product/{id}",
 				"DELETE /api/product/{id}",
+				"GET /api/products?name={name}",
 
 				"GET /api/categories",
 				"POST /api/categories",
 				"GET /api/category/{id}",
 				"PUT /api/category/{id}",
 				"DELETE /api/category/{id}",
+
+				"POST /api/checkout",
+				"GET /api/report/today",
+				"Comming Soon GET /api/report?date={date}",
 			},
 		}); err != nil {
 			http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
